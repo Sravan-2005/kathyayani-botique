@@ -1,0 +1,38 @@
+{
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^1.0.0-rc.4",
+    "express": "^5.2.1",
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@types/pg": "^8.20.2",
+    "drizzle-kit": "^1.0.0-rc.4",
+    "nodemon": "^3.1.14",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.23.5",
+    "typescript": "^7.0.2"
+  },
+  "name": "kathyayani-botique",
+  "version": "1.0.0",
+  "description": "PostgreSQL and Drizzle ORM example for Kathyayani Boutique",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "tsx  main.ts",
+    "start": "tsx src/db/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:pull": "drizzle-kit pull",
+    "db:studio": "drizzle-kit studio",
+    "dev:api":"pnpm --filter api dev"
+    
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module"
+}
