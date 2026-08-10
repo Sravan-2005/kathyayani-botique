@@ -5,10 +5,13 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { users } from "./src/db/user.js";
 import {addresses} from "./src/db/address.js"
 import { eq } from "drizzle-orm";
+import multer from "multer";
+
 import 'dotenv/config';
 const app: Express = express();
 const db = drizzle(process.env.DATABASE_URL!);
-
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 app.use(express.json());
 //create a product
 app.post("/products", async (req: Request, res: Response) => {
@@ -199,42 +202,42 @@ app.get("/orders", async (req: Request, res: Response) => {
   }
 });
 
-// create an order
-// app.post("/orders", async (req: Request, res: Response) => {
-//   try {
-//     const {
-//       user_id,
-//       phoneNumber,
-//       email,
-//       shipping_address,
-//       estimated_delivery,
-//       tracking_number
-//     } = req.body;
+create an order
+app.post("/orders", async (req: Request, res: Response) => {
+  try {
+    const {
+      user_id,
+      phoneNumber,
+      email,
+      shipping_address,
+      estimated_delivery,
+      tracking_number
+    } = req.body;
 
-//     const result = await db
-//       .insert(orders)
-//       .values({
-//      user_id,
-//       phoneNumber,
-//       email,
-//       shipping_address,
-//       estimated_delivery,
-//       tracking_number
-//       })
-//       .returning();
+    const result = await db
+      .insert(orders)
+      .values({
+     user_id,
+      phoneNumber,
+      email,
+      shipping_address,
+      estimated_delivery,
+      tracking_number
+      })
+      .returning();
 
-//     res.status(201).json({
-//       message: "order created successfully",
-//       data: result,
-//     });
-//   } catch (error) {
-//     console.error(error);
+    res.status(201).json({
+      message: "order created successfully",
+      data: result,
+    });
+  } catch (error) {
+    console.error(error);
 
-//     res.status(500).json({
-//       message: "Failed to create order",
-//     });
-//   }
-// });
+    res.status(500).json({
+      message: "Failed to create order",
+    });
+  }
+});
 
 //get all the users in the table
 app.get("/users", async (req: Request, res: Response) => {
@@ -573,7 +576,250 @@ app.get("/api/user/:id/address/:addid", async (req: Request, res: Response) => {
 });
 
 
+
 app.listen(3000, () => {
   console.log("Server is running on http://localhost:3000");
 });
 
+export async function uploadImage(file: Express.Multer.File) {
+  const key = `images/${Date.now()}-${file.originalname}`;
+
+  await r2.send(
+    new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET!,
+      Key: key,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+    })
+  );
+
+  return key;
+}
+
+
+
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+});
+
+app.post("/upload", upload.single("image"), async (req, res) => {
+  try {
+    const key = await uploadImage(req.file!);
+
+    res.json({
+      success: true,
+      key,
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      success: false,
+    });
+  }
+});
+
+// to register the user
+
+app.post("/api/auth/register", async (req: Request, res: Response) => {
+  try {
+    const {
+      name,
+      email,
+      password,
+    } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        message: "Name, email and password are required",
+      });
+    }
+
+    const existingUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email));
+
+    if (existingUser.length > 0) {
+      return res.status(409).json({
+        message: "User already exists",
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const result = await db
+      .insert(users)
+      .values({
+        name,
+        email,
+        passwordHash,
+      })
+      .returning();
+
+    res.status(201).json({
+      message: "User registered successfully",
+      data: result[0],
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      message: "Failed to register user",
+    });
+  }
+});
+
+// login the user
+
+app.post("/api/auth/login", async (req: Request, res: Response) => {
+  try {
+    const {
+      email,
+      password,
+    } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Email and password are required",
+      });
+    }
+
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email));
+
+    if (result.length === 0) {
+      return res.status(401).json({
+        message: "Invalid email or password",
+      });
+    }
+
+    const user = result[0];
+
+    const passwordMatch = await bcrypt.compare(
+      password,
+      user.passwordHash ?? ""
+    );
+
+    if (!passwordMatch) {
+      return res.status(401).json({
+        message: "Invalid email or password",
+      });
+    }
+
+    const accessToken = jwt.sign(
+      {
+        userId: user.id,
+        email: user.email,
+      },
+      process.env.ACCESS_TOKEN_SECRET!,
+      {
+        expiresIn: "15m",
+      }
+    );
+
+    const refreshToken = jwt.sign(
+      {
+        userId: user.id,
+      },
+      process.env.REFRESH_TOKEN_SECRET!,
+      {
+        expiresIn: "7d",
+      }
+    );
+
+    res.status(200).json({
+      message: "Login successful",
+      accessToken,
+      refreshToken,
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      message: "Failed to login",
+    });
+  }
+});
+
+// logout
+
+app.post("/api/auth/logout", async (req: Request, res: Response) => {
+  try {
+    const {
+      refreshToken,
+    } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({
+        message: "Refresh token is required",
+      });
+    }
+
+    // For now, logout is handled by removing
+    // the refresh token from the client.
+
+    res.status(200).json({
+      message: "Logout successful",
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      message: "Failed to logout",
+    });
+  }
+});
+
+// access tokens
+
+app.post(
+  "/api/auth/access-tokens",
+  async (req: Request, res: Response) => {
+    try {
+      const {
+        refreshToken,
+      } = req.body;
+
+      if (!refreshToken) {
+        return res.status(400).json({
+          message: "Refresh token is required",
+        });
+      }
+
+      const decoded = jwt.verify(
+        refreshToken,
+        process.env.REFRESH_TOKEN_SECRET!
+      ) as {
+        userId: string;
+      };
+
+      const accessToken = jwt.sign(
+        {
+          userId: decoded.userId,
+        },
+        process.env.ACCESS_TOKEN_SECRET!,
+        {
+          expiresIn: "15m",
+        }
+      );
+
+      res.status(200).json({
+        message: "Access token generated successfully",
+        accessToken,
+      });
+
+    } catch (error) {
+      console.error(error);
+
+      return res.status(401).json({
+        message: "Invalid or expired refresh token",
+      });
+    }
+  }
+);
