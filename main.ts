@@ -202,7 +202,7 @@ app.get("/orders", async (req: Request, res: Response) => {
   }
 });
 
-create an order
+// create an order
 app.post("/orders", async (req: Request, res: Response) => {
   try {
     const {
@@ -682,7 +682,7 @@ app.post("/api/auth/login", async (req: Request, res: Response) => {
 
     if (!email || !password) {
       return res.status(400).json({
-        message: "Email and password are required",
+        message: "Email and password are required",  
       });
     }
 
