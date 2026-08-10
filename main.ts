@@ -202,7 +202,7 @@ app.get("/orders", async (req: Request, res: Response) => {
   }
 });
 
-// create an order
+// create an order      
 app.post("/orders", async (req: Request, res: Response) => {
   try {
     const {
@@ -715,7 +715,7 @@ app.post("/api/auth/login", async (req: Request, res: Response) => {
         userId: user.id,
         email: user.email,
       },
-      process.env.ACCESS_TOKEN_SECRET!,
+      process.env.JWT_SECRET!,
       {
         expiresIn: "15m",
       }
@@ -725,7 +725,7 @@ app.post("/api/auth/login", async (req: Request, res: Response) => {
       {
         userId: user.id,
       },
-      process.env.REFRESH_TOKEN_SECRET!,
+      process.env.JWT_SECRET!,
       {
         expiresIn: "7d",
       }
