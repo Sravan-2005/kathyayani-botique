@@ -40,6 +40,11 @@ export const products = pgTable("products", {
       "it is so delicate so, wash with care",
     ]),
 
+  images: text("images")
+    .array()
+    .notNull()
+    .default([]),
+
   status: productStatusEnum("status")
     .notNull()
     .default("draft"),
